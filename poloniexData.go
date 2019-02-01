@@ -10,6 +10,7 @@ import (
   "os"
   "encoding/json"
   "time"
+  "math"
   "io/ioutil"
   "github.com/mongodb/mongo-go-driver/bson"
   "github.com/mongodb/mongo-go-driver/mongo"
@@ -77,6 +78,53 @@ func getBTC_ETH(client *mongo.Client, startTime int64) () {
       }
     }
   }
+  return
+}
+
+func calculateSMABB(elements []Candlestick) {
+  var sum,sma,sd float64
+  for i:=0; i<20; i++ {
+    sum += elements[i].Close
+  }
+  sma = sum/20
+  for i:=0; i<20; i++ {
+   sd += math.Pow(elements[i].Close - sma, 2)
+  }
+  sd = math.Sqrt(sd/20)
+  upperband := sma + (sd * 2)
+  lowerband := sma - (sd * 2)
+  fmt.Println("--------------------------------")
+  fmt.Println("Date : " + fmt.Sprintf("%f",elements[19].Date))
+  fmt.Println("The SD is : " + fmt.Sprintf("%.8f",sd))
+  fmt.Println("The Upper BB is : ", upperband)
+  fmt.Println("The SMA is : " + fmt.Sprintf("%.8f",sma))
+  fmt.Println("The Lower BB is : ", lowerband)
+  fmt.Println("--------------------------------")
+  return
+}
+
+func getExtraChartData(client *mongo.Client) {
+  collection := client.Database("poloniex").Collection("btc_eth")
+  filter := bson.M(nil)
+  count, err := collection.Count(context.Background(), filter)
+  cur, err := collection.Find(context.Background(), filter)
+  if err != nil { log.Fatal(err) }
+  elements := make([]Candlestick, count)
+  i := 0
+  // build array of stick data
+  for cur.Next(context.Background()) {
+    err := cur.Decode(&elements[i])
+    if err != nil { log.Fatal(err) }
+    i++
+  }
+  fmt.Println(elements[0])
+  marker := 20
+  for marker <= i {
+    frame := elements[marker-20: marker]
+    calculateSMABB(frame)
+    marker++
+  }
+  return
 }
 
 func listBTC_ETH(client *mongo.Client) {
@@ -105,14 +153,16 @@ func listBTC_ETH(client *mongo.Client) {
     fmt.Println("  QuoteVolume:  " + qv)
     fmt.Println("--------------------------------")
   }
+  return
 }
 
 func doMenu() (string) {
   var choice string
+  fmt.Println()
   fmt.Println("Welcome!")
   fmt.Println("Please pick an option from the list below.")
   fmt.Println("1. Get ETH/BTC chart/candlestick data.")
-  fmt.Println("2. Get ETH/BTC Orderbook information.")
+  fmt.Println("2. Calculate Extra chart data.")
   fmt.Println("3. List ETH/BTC chart/candlestick data.")
   fmt.Println("4. Exit.")
   fmt.Println()
@@ -138,11 +188,12 @@ func main() {
       getBTC_ETH(client, time.Now().Unix())
       break
     case "2":
-      fmt.Println("This is not complete yet.")
+      getExtraChartData(client)
       break
     case "3":
       listBTC_ETH(client)
       break
     }
   }
+  return
 }
