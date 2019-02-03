@@ -5,8 +5,8 @@ import (
   "log"
   "time"
   "fmt"
-  "github.com/NeedMoreVolume/poloniexData/Poloniex"
-  "github.com/NeedMoreVolume/poloniexData/Menu"
+  "github.com/NeedMoreVolume/PolomonGo/Poloniex"
+  "github.com/NeedMoreVolume/PolomonGo/Menu"
   "github.com/mongodb/mongo-go-driver/mongo"
 )
 
