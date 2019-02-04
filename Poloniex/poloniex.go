@@ -172,8 +172,69 @@ func ListCandles(client *mongo.Client, market *string) {
   return
 }
 
-func CalculateIchimokuCloud() {
-  fmt.Println("Not done yet, sorry.")
+func CalculateTenkanSen(elements []Candlestick) float64 {
+  var high9, low9 float64
+  for _, element := range elements {
+    if element.High > high9 {
+      high9 = element.High
+    }
+    if element.Close < low9 || low9 == 0 {
+      low9 = element.Close
+    }
+  }
+  ts := (high9 + low9)/2
+  return ts
+}
+
+func CalculateKijunSen(elements []Candlestick) float64 {
+  var high26, low26 float64
+  for _, element := range elements {
+    if element.High > high26 {
+      high26 = element.High
+    }
+    if element.Close < low26 || low26 == 0 {
+      low26 = element.Close
+    }
+  }
+  ks := (high26 + low26)/2
+  return ks
+}
+
+func CalculateSenkouSpanB (elements []Candlestick) float64 {
+  var high52, low52 float64
+  for _, element := range elements {
+    if element.High > high52 {
+      high52 = element.High
+    }
+    if element.Close < low52 || low52 == 0 {
+      low52 = element.Close
+    }
+  }
+  ssb := (high52+low52)/2
+  return ssb
+}
+
+func CalculateIchimokuCloud(elements []Candlestick) {
+  var ts float64
+  switch {
+  case len(elements)==9:
+    ts = CalculateTenkanSen(elements)
+  case len(elements)==26:
+    ks := CalculateKijunSen(elements)
+    ts = CalculateTenkanSen(elements[16:25])
+    ssa := (ts + ks)/2
+    fmt.Printf("Senkou Span A : %.8f\n", ssa)
+    fmt.Printf("Kijun-sen : %.8f\n", ks)
+  case len(elements)==52:
+    ts = CalculateTenkanSen(elements[42:51])
+    ks := CalculateKijunSen(elements[25:51])
+    ssb := CalculateSenkouSpanB(elements)
+    ssa := (ts + ks)/2
+    fmt.Printf("Senkou Span B : %.8f\n", ssb)
+    fmt.Printf("Senkou Span A : %.8f\n", ssa)
+    fmt.Printf("Kijun-sen : %.8f\n", ks)
+  }
+  fmt.Printf("Tenkan-sen : %.8f\n", ts)
   return
 }
 
@@ -193,19 +254,25 @@ func GetIchimokuCloud(client *mongo.Client, market *string) {
   }
   marker := 9
   for marker <= i {
+    fmt.Println()
     if marker-52 >= 0 {
-      // we have 9 days of data to start the ichimoku cloud calc.
-      //frame := elements[marker-52: marker]
-      CalculateIchimokuCloud()
+      //we have 52 previous days of data, so we can calculate the full cloud
+      frame := elements[marker-52: marker]
+      CalculateIchimokuCloud(frame)
     } else if marker-26 >= 0 {
       // we have 26 previous days of data
-      //frame := elements[marker-26: marker]
-      CalculateIchimokuCloud()
+      frame := elements[marker-26: marker]
+      CalculateIchimokuCloud(frame)
     } else if marker-9 >= 0 {
-      //we have 52 previous days of data, so we can calculate the full cloud
-      //frame := elements[marker-9: marker]
-      CalculateIchimokuCloud()
+      // we have 9 days of data to start the ichimoku cloud calc.
+      frame := elements[marker-9: marker]
+      CalculateIchimokuCloud(frame)
     }
+    if (marker+26) < i {
+      fmt.Printf("Chikou Span : %.8f\n", elements[marker+26].Close)
+    }
+    fmt.Println()
+    marker++
   }
   return
 }
