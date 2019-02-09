@@ -9,27 +9,17 @@ import (
   "encoding/json"
   "time"
   "io/ioutil"
-  "math"
   "github.com/mongodb/mongo-go-driver/bson"
   "github.com/mongodb/mongo-go-driver/mongo"
   "github.com/mongodb/mongo-go-driver/mongo/options"
+  "github.com/NeedMoreVolume/PolomonGo/Structs"
+  "github.com/NeedMoreVolume/PolomonGo/Calculations"
 )
 
 // base variables
 var myClient = &http.Client{Timeout: 10 * time.Second}
 const baseurl = "https://poloniex.com/public?command=returnChartData&currencyPair="
 
-
-type Candlestick struct {
-  Date float64
-  High float64
-  Low float64
-  Open float64
-  Close float64
-  Volume float64
-  QuoteVolume float64
-  WeightedAverage float64
-}
 
 func CheckDate(date *float64) bool {
   return (int64(*date) + 86400 < time.Now().Unix())
@@ -54,7 +44,7 @@ func GetCandlestickData(client *mongo.Client, startTime int64, market *string) (
   defer cur.Close(context.Background())
   var lastDate int = 0
   for cur.Next(context.Background()) {
-    var element Candlestick
+    var element structs.Candlestick
     err := cur.Decode(&element)
     if err != nil { log.Fatal(err) }
     lastDate = int(element.Date)
@@ -91,7 +81,7 @@ func GetCandlestickData(client *mongo.Client, startTime int64, market *string) (
   if err != nil {
     log.Fatal(err)
   }
-  var data []Candlestick
+  var data []structs.Candlestick
   json.Unmarshal(body, &data)
   for _, stick := range data {
     if CheckDate(&stick.Date) {
@@ -104,35 +94,13 @@ func GetCandlestickData(client *mongo.Client, startTime int64, market *string) (
   return
 }
 
-func Smabb(elements []Candlestick) {
-  var sum,sma,sd float64
-  for i:=0; i<20; i++ {
-    sum += elements[i].Close
-  }
-  sma = sum/20
-  for i:=0; i<20; i++ {
-   sd += math.Pow(elements[i].Close - sma, 2)
-  }
-  sd = math.Sqrt(sd/20)
-  upperband := sma + (sd * 2)
-  lowerband := sma - (sd * 2)
-  fmt.Printf("--------------------------------\n")
-  fmt.Printf("    Date    :  %.0f\n", elements[19].Date)
-  fmt.Printf("     SD     :  %.8f\n", sd)
-  fmt.Printf("  Upper BB  :  %.8f\n", upperband)
-  fmt.Printf("     SMA    :  %.8f\n", sma)
-  fmt.Printf("  Lower BB  :  %.8f\n", lowerband)
-  fmt.Printf("--------------------------------\n")
-  return
-}
-
 func GetSMAandBB(client *mongo.Client, market *string) {
   collection := client.Database("poloniex").Collection(*market)
   filter := bson.M(nil)
   count, err := collection.Count(context.Background(), filter)
   cur, err := collection.Find(context.Background(), filter)
   if err != nil { log.Fatal(err) }
-  elements := make([]Candlestick, count)
+  elements := make([]structs.Candlestick, count)
   i := 0
   // build array of stick data
   for cur.Next(context.Background()) {
@@ -143,7 +111,7 @@ func GetSMAandBB(client *mongo.Client, market *string) {
   marker := 20
   for marker <= i {
     frame := elements[marker-20: marker]
-    Smabb(frame)
+    calculations.Smabb(frame)
     marker++
   }
   return
@@ -156,7 +124,7 @@ func ListCandles(client *mongo.Client, market *string) {
   if err != nil { log.Fatal(err) }
   defer cur.Close(context.Background())
   for cur.Next(context.Background()) {
-    var element Candlestick
+    var element structs.Candlestick
     err := cur.Decode(&element)
     if err != nil { log.Fatal(err) }
     fmt.Printf("-------------------------------\n")
@@ -172,79 +140,13 @@ func ListCandles(client *mongo.Client, market *string) {
   return
 }
 
-func CalculateTenkanSen(elements []Candlestick) float64 {
-  var high9, low9 float64
-  for _, element := range elements {
-    if element.High > high9 {
-      high9 = element.High
-    }
-    if element.Close < low9 || low9 == 0 {
-      low9 = element.Close
-    }
-  }
-  ts := (high9 + low9)/2
-  return ts
-}
-
-func CalculateKijunSen(elements []Candlestick) float64 {
-  var high26, low26 float64
-  for _, element := range elements {
-    if element.High > high26 {
-      high26 = element.High
-    }
-    if element.Close < low26 || low26 == 0 {
-      low26 = element.Close
-    }
-  }
-  ks := (high26 + low26)/2
-  return ks
-}
-
-func CalculateSenkouSpanB (elements []Candlestick) float64 {
-  var high52, low52 float64
-  for _, element := range elements {
-    if element.High > high52 {
-      high52 = element.High
-    }
-    if element.Close < low52 || low52 == 0 {
-      low52 = element.Close
-    }
-  }
-  ssb := (high52+low52)/2
-  return ssb
-}
-
-func CalculateIchimokuCloud(elements []Candlestick) {
-  var ts float64
-  switch {
-  case len(elements)==9:
-    ts = CalculateTenkanSen(elements)
-  case len(elements)==26:
-    ks := CalculateKijunSen(elements)
-    ts = CalculateTenkanSen(elements[16:25])
-    ssa := (ts + ks)/2
-    fmt.Printf("Senkou Span A : %.8f\n", ssa)
-    fmt.Printf("Kijun-sen : %.8f\n", ks)
-  case len(elements)==52:
-    ts = CalculateTenkanSen(elements[42:51])
-    ks := CalculateKijunSen(elements[25:51])
-    ssb := CalculateSenkouSpanB(elements)
-    ssa := (ts + ks)/2
-    fmt.Printf("Senkou Span B : %.8f\n", ssb)
-    fmt.Printf("Senkou Span A : %.8f\n", ssa)
-    fmt.Printf("Kijun-sen : %.8f\n", ks)
-  }
-  fmt.Printf("Tenkan-sen : %.8f\n", ts)
-  return
-}
-
 func GetIchimokuCloud(client *mongo.Client, market *string) {
   collection := client.Database("poloniex").Collection(*market)
   filter := bson.M(nil)
   count, err := collection.Count(context.Background(), filter)
   cur, err := collection.Find(context.Background(), filter)
   if err != nil { log.Fatal(err) }
-  elements := make([]Candlestick, count)
+  elements := make([]structs.Candlestick, count)
   i := 0
   // build array of stick data
   for cur.Next(context.Background()) {
@@ -258,15 +160,18 @@ func GetIchimokuCloud(client *mongo.Client, market *string) {
     if marker-52 >= 0 {
       //we have 52 previous days of data, so we can calculate the full cloud
       frame := elements[marker-52: marker]
-      CalculateIchimokuCloud(frame)
+      cloud := calculations.CalculateIchimokuCloud(frame)
+      fmt.Printf("Tenkan-sen : %.8f\nKijun-sen : %.8f\nSenkou Span A : %.8f\nSenkou Span B : %.8f\n",cloud[0], cloud[1], cloud[2], cloud[3])
     } else if marker-26 >= 0 {
       // we have 26 previous days of data
       frame := elements[marker-26: marker]
-      CalculateIchimokuCloud(frame)
+      cloud := calculations.CalculateIchimokuCloud(frame)
+      fmt.Printf("Tenkan-sen : %.8f\nKijun-sen : %.8f\nSenkou Span A : %.8f\nSenkou Span B : %.8f\n",cloud[0], cloud[1], cloud[2], cloud[3])
     } else if marker-9 >= 0 {
       // we have 9 days of data to start the ichimoku cloud calc.
       frame := elements[marker-9: marker]
-      CalculateIchimokuCloud(frame)
+      cloud := calculations.CalculateIchimokuCloud(frame)
+      fmt.Printf("Tenkan-sen : %.8f\nKijun-sen : %.8f\nSenkou Span A : %.8f\nSenkou Span B : %.8f\n",cloud[0], cloud[1], cloud[2], cloud[3])
     }
     if (marker+26) < i {
       fmt.Printf("Chikou Span : %.8f\n", elements[marker+26].Close)
