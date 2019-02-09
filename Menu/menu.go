@@ -12,7 +12,8 @@ Please pick an option from the list below.
   1. Get candlestick data.
   2. List candlestick data.
   3. Calculate 20 day SMA and Bollinger Bands.
-  4. Calculate standard Ichimoku Cloud.
+  4. Calculate Standard Ichimoku Cloud.
+  5. Calculate 14 day RSI.
   e. Exit.
   `)
   scanner := bufio.NewScanner(os.Stdin)

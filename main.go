@@ -15,9 +15,7 @@ func main() {
     Welcome!`)
   client, err := mongo.Connect(context.Background(), "mongodb://localhost:27017")
   err = client.Ping(context.Background(), nil)
-  if err != nil {
-    log.Fatal(err)
-  }
+  if err != nil { log.Fatal(err) }
   // connected to MongoDB
   var choice string = ""
   var subchoice string = ""
@@ -39,6 +37,10 @@ func main() {
     case "4":
       menu.SubMenu(&subchoice)
       poloniex.GetIchimokuCloud(client, &subchoice)
+      break
+    case "5":
+      menu.SubMenu(&subchoice)
+      poloniex.GetRsi(client, &subchoice)
       break
     case "e":
       fmt.Println(`

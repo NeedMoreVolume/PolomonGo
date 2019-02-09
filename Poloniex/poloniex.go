@@ -16,10 +16,8 @@ import (
   "github.com/NeedMoreVolume/PolomonGo/Calculations"
 )
 
-// base variables
 var myClient = &http.Client{Timeout: 10 * time.Second}
 const baseurl = "https://poloniex.com/public?command=returnChartData&currencyPair="
-
 
 func CheckDate(date *float64) bool {
   return (int64(*date) + 86400 < time.Now().Unix())
@@ -28,7 +26,6 @@ func CheckDate(date *float64) bool {
 func GetCandlestickData(client *mongo.Client, startTime int64, market *string) () {
   startTime = startTime/1000000000
   collection := client.Database("poloniex").Collection(*market)
-  // check the last date in the collections
   filter := bson.M(nil)
   count, countErr := collection.CountDocuments(context.Background(), filter)
   if countErr != nil { log.Fatal(countErr) }
@@ -48,9 +45,6 @@ func GetCandlestickData(client *mongo.Client, startTime int64, market *string) (
     err := cur.Decode(&element)
     if err != nil { log.Fatal(err) }
     lastDate = int(element.Date)
-  }
-  if err := cur.Err(); err != nil {
-		log.Fatal(err)
   }
   var url string
   var pair string
@@ -74,13 +68,9 @@ func GetCandlestickData(client *mongo.Client, startTime int64, market *string) (
     url = baseurl + pair + "&start=" + strconv.Itoa(lastDate + 86400) + "&end=9999999999&period=86400"
   }
   res, err := http.Get(url)
-  if err != nil {
-    log.Fatal(err)
-  }
+  if err != nil { log.Fatal(err) }
   body, err := ioutil.ReadAll(res.Body)
-  if err != nil {
-    log.Fatal(err)
-  }
+  if err != nil { log.Fatal(err) }
   var data []structs.Candlestick
   json.Unmarshal(body, &data)
   for _, stick := range data {
@@ -97,12 +87,12 @@ func GetCandlestickData(client *mongo.Client, startTime int64, market *string) (
 func GetSMAandBB(client *mongo.Client, market *string) {
   collection := client.Database("poloniex").Collection(*market)
   filter := bson.M(nil)
-  count, err := collection.Count(context.Background(), filter)
-  cur, err := collection.Find(context.Background(), filter)
-  if err != nil { log.Fatal(err) }
+  count, countErr := collection.Count(context.Background(), filter)
+  if countErr != nil { log.Fatal(countErr) }
+  cur, findErr := collection.Find(context.Background(), filter)
+  if findErr != nil { log.Fatal(findErr) }
   elements := make([]structs.Candlestick, count)
   i := 0
-  // build array of stick data
   for cur.Next(context.Background()) {
     err := cur.Decode(&elements[i])
     if err != nil { log.Fatal(err) }
@@ -148,7 +138,6 @@ func GetIchimokuCloud(client *mongo.Client, market *string) {
   if err != nil { log.Fatal(err) }
   elements := make([]structs.Candlestick, count)
   i := 0
-  // build array of stick data
   for cur.Next(context.Background()) {
     err := cur.Decode(&elements[i])
     if err != nil { log.Fatal(err) }
@@ -158,17 +147,14 @@ func GetIchimokuCloud(client *mongo.Client, market *string) {
   for marker <= i {
     fmt.Println()
     if marker-52 >= 0 {
-      //we have 52 previous days of data, so we can calculate the full cloud
       frame := elements[marker-52: marker]
       cloud := calculations.CalculateIchimokuCloud(frame)
       fmt.Printf("Tenkan-sen : %.8f\nKijun-sen : %.8f\nSenkou Span A : %.8f\nSenkou Span B : %.8f\n",cloud[0], cloud[1], cloud[2], cloud[3])
     } else if marker-26 >= 0 {
-      // we have 26 previous days of data
       frame := elements[marker-26: marker]
       cloud := calculations.CalculateIchimokuCloud(frame)
       fmt.Printf("Tenkan-sen : %.8f\nKijun-sen : %.8f\nSenkou Span A : %.8f\nSenkou Span B : %.8f\n",cloud[0], cloud[1], cloud[2], cloud[3])
     } else if marker-9 >= 0 {
-      // we have 9 days of data to start the ichimoku cloud calc.
       frame := elements[marker-9: marker]
       cloud := calculations.CalculateIchimokuCloud(frame)
       fmt.Printf("Tenkan-sen : %.8f\nKijun-sen : %.8f\nSenkou Span A : %.8f\nSenkou Span B : %.8f\n",cloud[0], cloud[1], cloud[2], cloud[3])
@@ -177,6 +163,31 @@ func GetIchimokuCloud(client *mongo.Client, market *string) {
       fmt.Printf("Chikou Span : %.8f\n", elements[marker+26].Close)
     }
     fmt.Println()
+    marker++
+  }
+  return
+}
+
+func GetRsi(client *mongo.Client, market *string) {
+  collection := client.Database("poloniex").Collection(*market)
+  filter := bson.M(nil)
+  count, countErr := collection.Count(context.Background(), filter)
+  if countErr != nil { log.Fatal(countErr) }
+  cur, findErr := collection.Find(context.Background(), filter)
+  if findErr != nil { log.Fatal(findErr) }
+  elements := make([]structs.Candlestick, count)
+  i := 0
+  for cur.Next(context.Background()) {
+    err := cur.Decode(&elements[i])
+    if err != nil { log.Fatal(err) }
+    i++
+  }
+  marker := 14
+  var avgLoss, avgGain float64
+  avgLoss, avgGain = 0, 0
+  for marker <= i {
+    frame := elements[marker-14: marker]
+    calculations.Rsi(frame, &avgLoss, &avgGain)
     marker++
   }
   return
