@@ -87,7 +87,7 @@ func GetCandlestickData(client *mongo.Client, startTime int64, market *string) (
 func GetSMAandBB(client *mongo.Client, market *string) {
   collection := client.Database("poloniex").Collection(*market)
   filter := bson.D{}
-  count, countErr := collection.Count(context.Background(), filter)
+  count, countErr := collection.CountDocuments(context.Background(), filter)
   if countErr != nil { log.Fatal(countErr) }
   cur, findErr := collection.Find(context.Background(), filter)
   if findErr != nil { log.Fatal(findErr) }
@@ -133,7 +133,7 @@ func ListCandles(client *mongo.Client, market *string) {
 func GetIchimokuCloud(client *mongo.Client, market *string) {
   collection := client.Database("poloniex").Collection(*market)
   filter := bson.D{}
-  count, err := collection.Count(context.Background(), filter)
+  count, err := collection.CountDocuments(context.Background(), filter)
   cur, err := collection.Find(context.Background(), filter)
   if err != nil { log.Fatal(err) }
   elements := make([]structs.Candlestick, count)
@@ -171,7 +171,7 @@ func GetIchimokuCloud(client *mongo.Client, market *string) {
 func GetRsi(client *mongo.Client, market *string) {
   collection := client.Database("poloniex").Collection(*market)
   filter := bson.D{}
-  count, countErr := collection.Count(context.Background(), filter)
+  count, countErr := collection.CountDocuments(context.Background(), filter)
   if countErr != nil { log.Fatal(countErr) }
   cur, findErr := collection.Find(context.Background(), filter)
   if findErr != nil { log.Fatal(findErr) }
