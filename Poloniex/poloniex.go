@@ -26,7 +26,7 @@ func CheckDate(date *float64) bool {
 func GetCandlestickData(client *mongo.Client, startTime int64, market *string) () {
   startTime = startTime/1000000000
   collection := client.Database("poloniex").Collection(*market)
-  filter := bson.M(nil)
+  filter := bson.D{}
   count, countErr := collection.CountDocuments(context.Background(), filter)
   if countErr != nil { log.Fatal(countErr) }
   if count > 0 {
@@ -86,7 +86,7 @@ func GetCandlestickData(client *mongo.Client, startTime int64, market *string) (
 
 func GetSMAandBB(client *mongo.Client, market *string) {
   collection := client.Database("poloniex").Collection(*market)
-  filter := bson.M(nil)
+  filter := bson.D{}
   count, countErr := collection.Count(context.Background(), filter)
   if countErr != nil { log.Fatal(countErr) }
   cur, findErr := collection.Find(context.Background(), filter)
@@ -109,7 +109,7 @@ func GetSMAandBB(client *mongo.Client, market *string) {
 
 func ListCandles(client *mongo.Client, market *string) {
   collection := client.Database("poloniex").Collection(*market)
-  filter := bson.M(nil)
+  filter := bson.D{}
   cur, err := collection.Find(context.Background(), filter)
   if err != nil { log.Fatal(err) }
   defer cur.Close(context.Background())
@@ -132,7 +132,7 @@ func ListCandles(client *mongo.Client, market *string) {
 
 func GetIchimokuCloud(client *mongo.Client, market *string) {
   collection := client.Database("poloniex").Collection(*market)
-  filter := bson.M(nil)
+  filter := bson.D{}
   count, err := collection.Count(context.Background(), filter)
   cur, err := collection.Find(context.Background(), filter)
   if err != nil { log.Fatal(err) }
@@ -170,7 +170,7 @@ func GetIchimokuCloud(client *mongo.Client, market *string) {
 
 func GetRsi(client *mongo.Client, market *string) {
   collection := client.Database("poloniex").Collection(*market)
-  filter := bson.M(nil)
+  filter := bson.D{}
   count, countErr := collection.Count(context.Background(), filter)
   if countErr != nil { log.Fatal(countErr) }
   cur, findErr := collection.Find(context.Background(), filter)
