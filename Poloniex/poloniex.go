@@ -12,6 +12,7 @@ import (
   "github.com/mongodb/mongo-go-driver/bson"
   "github.com/mongodb/mongo-go-driver/mongo"
   "github.com/mongodb/mongo-go-driver/mongo/options"
+  "github.com/gocql/gocql"
   "github.com/NeedMoreVolume/PolomonGo/Structs"
   "github.com/NeedMoreVolume/PolomonGo/Calculations"
 )
@@ -23,7 +24,36 @@ func CheckDate(date *float64) bool {
   return (int64(*date) + 86400 < time.Now().Unix())
 }
 
-func GetCandlestickData(client *mongo.Client, startTime int64, market *string) () {
+func GetCandlestickData(lastDate *int, market *string) []byte {
+  var url string
+  var pair string
+  switch *market {
+  case "btc_etc":
+    pair = "BTC_ETC"
+  case "btc_eth":
+    pair = "BTC_ETH"
+  case "btc_ltc":
+    pair = "BTC_LTC"
+  case "btc_rep":
+    pair = "BTC_REP"
+  case "btc_xmr":
+    pair = "BTC_XMR"
+  case "btc_xrp":
+    pair = "BTC_XRP"
+  }
+  if *lastDate == 0 {
+    url = baseurl + pair + "&start=0&end=9999999999&period=86400"
+  } else {
+    url = baseurl + pair + "&start=" + strconv.Itoa(*lastDate + 86400) + "&end=9999999999&period=86400"
+  }
+  res, err := http.Get(url)
+  if err != nil { log.Fatal(err) }
+  body, err := ioutil.ReadAll(res.Body)
+  if err != nil { log.Fatal(err) }
+  return body
+}
+
+func PutDataInMongo(client *mongo.Client, startTime int64, market *string) () {
   startTime = startTime/1000000000
   collection := client.Database("poloniex").Collection(*market)
   filter := bson.M(nil)
@@ -46,32 +76,8 @@ func GetCandlestickData(client *mongo.Client, startTime int64, market *string) (
     if err != nil { log.Fatal(err) }
     lastDate = int(element.Date)
   }
-  var url string
-  var pair string
-  switch *market {
-  case "btc_etc":
-    pair = "BTC_ETC"
-  case "btc_eth":
-    pair = "BTC_ETH"
-  case "btc_ltc":
-    pair = "BTC_LTC"
-  case "btc_rep":
-    pair = "BTC_REP"
-  case "btc_xmr":
-    pair = "BTC_XMR"
-  case "btc_xrp":
-    pair = "BTC_XRP"
-  }
-  if lastDate == 0 {
-    url = baseurl + pair + "&start=0&end=9999999999&period=86400"
-  } else {
-    url = baseurl + pair + "&start=" + strconv.Itoa(lastDate + 86400) + "&end=9999999999&period=86400"
-  }
-  res, err := http.Get(url)
-  if err != nil { log.Fatal(err) }
-  body, err := ioutil.ReadAll(res.Body)
-  if err != nil { log.Fatal(err) }
   var data []structs.Candlestick
+  body := GetCandlestickData(&lastDate, market)
   json.Unmarshal(body, &data)
   for _, stick := range data {
     if CheckDate(&stick.Date) {
@@ -84,10 +90,43 @@ func GetCandlestickData(client *mongo.Client, startTime int64, market *string) (
   return
 }
 
+func PutDataInCassandra(market *string) {
+	// connect to cassandra.
+	cluster := gocql.NewCluster("127.0.0.1")
+    cluster.Keyspace = "cluster1"
+    cluster.Consistency = gocql.One
+	session, err := cluster.CreateSession()
+	if err != nil {log.Fatal(err)}
+	var timestamp float64
+	var lastDate int = 0
+	defer session.Close()
+	// check for the last date of stick data in cassandra.
+	var iter *gocql.Iter
+	query := `SELECT timestamp FROM poloniex_` + *market
+	iter = session.Query(query).Iter()
+	for iter.Scan(&timestamp) {
+		if lastDate < int(timestamp) {
+			lastDate = int(timestamp)
+		}
+	}
+	if err := iter.Close(); err != nil {log.Fatal(err)}
+	// get data to put in cassandra.
+	var data []structs.Candlestick
+	body := GetCandlestickData(&lastDate, market)
+	json.Unmarshal(body, &data)
+	for _, stick := range data {
+		if CheckDate(&stick.Date) {
+			//INSERT ONE STICK WEW
+			query := `INSERT INTO poloniex_` + *market + ` (id, timestamp, high, low, open, close, volume, quotevolume, weightedaverage) VALUES (uuid(), ?, ?, ?, ?, ?, ?, ?, ?)`
+			if err := session.Query(query, stick.Date, stick.High, stick.Low, stick.Open, stick.Close, stick.Volume, stick.QuoteVolume, stick.WeightedAverage).Exec(); err != nil {log.Fatal(err)}
+		}
+	}
+}
+
 func GetSMAandBB(client *mongo.Client, market *string) {
   collection := client.Database("poloniex").Collection(*market)
   filter := bson.M(nil)
-  count, countErr := collection.Count(context.Background(), filter)
+  count, countErr := collection.CountDocuments(context.Background(), filter)
   if countErr != nil { log.Fatal(countErr) }
   cur, findErr := collection.Find(context.Background(), filter)
   if findErr != nil { log.Fatal(findErr) }
@@ -107,7 +146,7 @@ func GetSMAandBB(client *mongo.Client, market *string) {
   return
 }
 
-func ListCandles(client *mongo.Client, market *string) {
+func ListMongoCandles(client *mongo.Client, market *string) {
   collection := client.Database("poloniex").Collection(*market)
   filter := bson.M(nil)
   cur, err := collection.Find(context.Background(), filter)
@@ -133,7 +172,7 @@ func ListCandles(client *mongo.Client, market *string) {
 func GetIchimokuCloud(client *mongo.Client, market *string) {
   collection := client.Database("poloniex").Collection(*market)
   filter := bson.M(nil)
-  count, err := collection.Count(context.Background(), filter)
+  count, err := collection.CountDocuments(context.Background(), filter)
   cur, err := collection.Find(context.Background(), filter)
   if err != nil { log.Fatal(err) }
   elements := make([]structs.Candlestick, count)
@@ -171,7 +210,7 @@ func GetIchimokuCloud(client *mongo.Client, market *string) {
 func GetRsi(client *mongo.Client, market *string) {
   collection := client.Database("poloniex").Collection(*market)
   filter := bson.M(nil)
-  count, countErr := collection.Count(context.Background(), filter)
+  count, countErr := collection.CountDocuments(context.Background(), filter)
   if countErr != nil { log.Fatal(countErr) }
   cur, findErr := collection.Find(context.Background(), filter)
   if findErr != nil { log.Fatal(findErr) }

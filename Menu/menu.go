@@ -9,11 +9,13 @@ import (
 func Menu(choice *string) {
   fmt.Println(`
 Please pick an option from the list below.
-  1. Get candlestick data.
-  2. List candlestick data.
-  3. Calculate 20 day SMA and Bollinger Bands.
-  4. Calculate Standard Ichimoku Cloud.
-  5. Calculate 14 day RSI.
+  1. Get candlestick data for Mongo.
+  2. Get candlestick data for Cassandra.
+  3. List candlestick data for Mongo.
+  4. List candlestick data for Cassandra.
+  5. Calculate 20 day SMA and Bollinger Bands.
+  6. Calculate Standard Ichimoku Cloud.
+  7. Calculate 14 day RSI.
   e. Exit.
   `)
   scanner := bufio.NewScanner(os.Stdin)

@@ -13,7 +13,7 @@ import (
 func main() {
   fmt.Println(`
     Welcome!`)
-  client, err := mongo.Connect(context.Background(), "mongodb://localhost:27017")
+  client, err := mongo.Connect(context.Background())
   err = client.Ping(context.Background(), nil)
   if err != nil { log.Fatal(err) }
   // connected to MongoDB
@@ -24,21 +24,29 @@ func main() {
     switch(choice) {
     case "1":
       menu.SubMenu(&subchoice)
-      poloniex.GetCandlestickData(client, time.Now().Unix(), &subchoice)
+      poloniex.PutDataInMongo(client, time.Now().Unix(), &subchoice)
       break
     case "2":
       menu.SubMenu(&subchoice)
-      poloniex.ListCandles(client, &subchoice)
+      poloniex.PutDataInCassandra(&subchoice)
       break
     case "3":
       menu.SubMenu(&subchoice)
-      poloniex.GetSMAandBB(client, &subchoice)
+      poloniex.ListMongoCandles(client, &subchoice)
       break
     case "4":
       menu.SubMenu(&subchoice)
-      poloniex.GetIchimokuCloud(client, &subchoice)
+      //poloniex.ListCassandraCandles()
       break
     case "5":
+      menu.SubMenu(&subchoice)
+      poloniex.GetSMAandBB(client, &subchoice)
+      break
+    case "6":
+      menu.SubMenu(&subchoice)
+      poloniex.GetIchimokuCloud(client, &subchoice)
+      break
+    case "7":
       menu.SubMenu(&subchoice)
       poloniex.GetRsi(client, &subchoice)
       break
