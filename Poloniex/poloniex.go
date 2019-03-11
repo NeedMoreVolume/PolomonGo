@@ -24,29 +24,7 @@ func CheckDate(date *float64) bool {
   return (int64(*date) + 86400 < time.Now().Unix())
 }
 
-func GetCandlestickData(client *mongo.Client, startTime int64, market *string) () {
-  startTime = startTime/1000000000
-  collection := client.Database("poloniex").Collection(*market)
-  filter := bson.D{}
-  count, countErr := collection.CountDocuments(context.Background(), filter)
-  if countErr != nil { log.Fatal(countErr) }
-  if count > 0 {
-    count -= 1
-  } else {
-    count = 0
-  }
-  options := options.FindOptions{}
-  options.SetSkip(count)
-  cur, err := collection.Find(context.Background(), filter, &options)
-  if err != nil { log.Fatal(err) }
-  defer cur.Close(context.Background())
-  var lastDate int = 0
-  for cur.Next(context.Background()) {
-    var element structs.Candlestick
-    err := cur.Decode(&element)
-    if err != nil { log.Fatal(err) }
-    lastDate = int(element.Date)
-  }
+func GetCandlestickData(lastDate *int, market *string) []byte {
   var url string
   var pair string
   switch *market {
