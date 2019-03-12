@@ -3,8 +3,56 @@ package menu
 import (
   "os"
   "fmt"
+  "time"
   "bufio"
+  "github.com/NeedMoreVolume/PolomonGo/Poloniex"
+  "github.com/mongodb/mongo-go-driver/mongo"
 )
+
+func MenuHandler(client *mongo.Client) {
+  fmt.Println(`
+    Welcome!`)
+  var choice string = ""
+  var subchoice string = ""
+  for choice != "e" {
+    Menu(&choice)
+    switch(choice) {
+    case "1":
+      SubMenu(&subchoice)
+      poloniex.PutDataInMongo(client, time.Now().Unix(), &subchoice)
+      break
+    case "2":
+      SubMenu(&subchoice)
+      poloniex.PutDataInCassandra(&subchoice)
+      break
+    case "3":
+      SubMenu(&subchoice)
+      poloniex.ListMongoCandles(client, &subchoice)
+      break
+    case "4":
+      SubMenu(&subchoice)
+      //poloniex.ListCassandraCandles()
+      break
+    case "5":
+      SubMenu(&subchoice)
+      poloniex.GetSMAandBB(client, &subchoice)
+      break
+    case "6":
+      SubMenu(&subchoice)
+      poloniex.GetIchimokuCloud(client, &subchoice)
+      break
+    case "7":
+      SubMenu(&subchoice)
+      poloniex.GetRsi(client, &subchoice)
+      break
+    case "e":
+      fmt.Println(`
+  Goodbye!
+        `)
+      return
+    }
+  }
+}
 
 func Menu(choice *string) {
   fmt.Println(`
